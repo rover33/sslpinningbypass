@@ -1,21 +1,23 @@
 if (ObjC.available) {
     console.log("[*] Starting iOS SSL Pinning Bypass");
 
-    // Hook SecTrustEvaluate (iOS Security Framework, used in URLSession)
+    // Bypass ptrace anti-debugging
     try {
-        var SecTrustEvaluate = Module.findExportByName("Security", "SecTrustEvaluate");
-        if (SecTrustEvaluate) {
-            Interceptor.replace(SecTrustEvaluate, new NativeCallback(function (trust, result) {
-                console.log("[*] Hooking SecTrustEvaluate");
-                Memory.writePointer(result, 1); // kSecTrustResultUnspecified
-                return 0; // Success
-            }, 'int', ['pointer', 'pointer']));
-            console.log("[+] SecTrustEvaluate hooked");
+        var ptrace = Module.findExportByName(null, "ptrace");
+        if (ptrace) {
+            Interceptor.replace(ptrace, new NativeCallback(function(request, pid, addr, data) {
+                console.log("[*] Bypassing ptrace");
+                if (request === 31) { // PT_DENY_ATTACH
+                    return -1; // Fail the attach attempt
+                }
+                return 0;
+            }, 'int', ['int', 'int', 'pointer', 'pointer']));
+            console.log("[+] ptrace hooked");
         } else {
-            console.log("[-] SecTrustEvaluate not found");
+            console.log("[-] ptrace not found");
         }
     } catch (e) {
-        console.log("[-] Error hooking SecTrustEvaluate: " + e);
+        console.log("[-] Error hooking ptrace: " + e);
     }
 
     // Hook SecTrustEvaluateWithError (iOS 12+, modern apps)
@@ -33,22 +35,6 @@ if (ObjC.available) {
         }
     } catch (e) {
         console.log("[-] Error hooking SecTrustEvaluateWithError: " + e);
-    }
-
-    // Hook SSLSetSessionOption (for low-level SSL)
-    try {
-        var SSLSetSessionOption = Module.findExportByName("Security", "SSLSetSessionOption");
-        if (SSLSetSessionOption) {
-            Interceptor.replace(SSLSetSessionOption, new NativeCallback(function (session, option, value) {
-                console.log("[*] Hooking SSLSetSessionOption");
-                return 0; // Success, bypass restrictions
-            }, 'int', ['pointer', 'int', 'bool']));
-            console.log("[+] SSLSetSessionOption hooked");
-        } else {
-            console.log("[-] SSLSetSessionOption not found");
-        }
-    } catch (e) {
-        console.log("[-] Error hooking SSLSetSessionOption: " + e);
     }
 
     console.log("[*] iOS SSL Pinning Bypass Complete");
