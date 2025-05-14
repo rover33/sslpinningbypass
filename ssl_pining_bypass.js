@@ -20,6 +20,22 @@ if (ObjC.available) {
         console.log("[-] Error hooking ptrace: " + e);
     }
 
+    // Bypass sysctl (jailbreak/Frida detection)
+    try {
+        var sysctl = Module.findExportByName(null, "sysctl");
+        if (sysctl) {
+            Interceptor.replace(sysctl, new NativeCallback(function(name, namelen, oldp, oldlenp, newp, newlen) {
+                console.log("[*] Bypassing sysctl");
+                return 0; // Prevent detection of Frida or jailbreak
+            }, 'int', ['pointer', 'uint', 'pointer', 'pointer', 'pointer', 'uint']));
+            console.log("[+] sysctl hooked");
+        } else {
+            console.log("[-] sysctl not found");
+        }
+    } catch (e) {
+        console.log("[-] Error hooking sysctl: " + e);
+    }
+
     // Hook SecTrustEvaluateWithError (iOS 12+, modern apps)
     try {
         var SecTrustEvaluateWithError = Module.findExportByName("Security", "SecTrustEvaluateWithError");
